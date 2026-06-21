@@ -32,6 +32,7 @@ import {
   SLASH_COMMANDS,
   type SlashMenuHandle,
 } from "./SlashCommandMenu";
+import { codeBlockExtension } from "../extensions/codeBlockLowlight";
 
 /* ── Slash Command Extension ─────────────────────── */
 function buildSlashExtension() {
@@ -157,7 +158,9 @@ export function Editor({ pageId, initialContent }: EditorProps) {
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         link: { openOnClick: false },
+        codeBlock: false,
       }),
+      codeBlockExtension,
       Placeholder.configure({
         placeholder: "Start writing, or type '/' for commands…",
       }),

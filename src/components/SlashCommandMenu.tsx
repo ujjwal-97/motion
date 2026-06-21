@@ -88,7 +88,7 @@ export const SLASH_COMMANDS: SlashCommandItem[] = [
   },
   {
     title: "Code Block",
-    description: "Write a code snippet",
+    description: "Syntax-highlighted code with auto language detection",
     icon: "<>",
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).setCodeBlock().run(),
