@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { clsx } from "clsx";
 import { LUCIDE_ICON_MAP } from "./pageIconPack";
-import { isIconUrl, parseLucideIcon } from "../utils/pageIcon";
+import { DEFAULT_PAGE_ICON } from "../constants/icons";
+import { isIconUrl, resolveLucideIconName } from "../utils/pageIcon";
 
 const SIZE_MAP = {
   xs: 14,
@@ -62,11 +63,22 @@ export function PageIcon({
     );
   }
 
-  const lucideName = parseLucideIcon(icon);
+  const lucideName = resolveLucideIconName(icon || DEFAULT_PAGE_ICON);
   if (lucideName) {
     const LucideIcon = LUCIDE_ICON_MAP[lucideName] ?? FileText;
     return (
       <LucideIcon
+        size={pixelSize}
+        strokeWidth={1.75}
+        className={clsx("page-icon-lucide", className)}
+      />
+    );
+  }
+
+  if (!icon) {
+    const Fallback = LUCIDE_ICON_MAP["file-text"] ?? FileText;
+    return (
+      <Fallback
         size={pixelSize}
         strokeWidth={1.75}
         className={clsx("page-icon-lucide", className)}
@@ -79,7 +91,7 @@ export function PageIcon({
       className={clsx("flex-shrink-0 leading-none select-none", className)}
       style={{ fontSize: pixelSize }}
     >
-      {icon || "📄"}
+      {icon}
     </span>
   );
 }

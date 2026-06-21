@@ -64,7 +64,7 @@ fn bootstrap_workspaces(conn: &Connection) -> Result<(), String> {
 
         conn.execute(
             "INSERT INTO workspaces (id, name, icon, created_at, updated_at)
-             VALUES (?, ?, '🏠', ?, ?)",
+             VALUES (?, ?, 'lucide:home', ?, ?)",
             params![id, name, now, now],
         )
         .map_err(|e| e.to_string())?;

@@ -20,6 +20,7 @@ import { ImportWorkspaceDialog } from "./ImportWorkspaceDialog";
 import { IconPicker } from "./IconPicker";
 import { PageIcon } from "./PageIcon";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { DEFAULT_WORKSPACE_ICON } from "../constants/icons";
 
 /* ── Page Item ─────────────────────────────────────── */
 interface PageItemProps {
@@ -305,12 +306,12 @@ function WorkspaceHeader() {
                 }}
                 title="Change icon"
               >
-                <PageIcon icon={activeWorkspace?.icon ?? "🏠"} size="xs" />
+                <PageIcon icon={activeWorkspace?.icon ?? DEFAULT_WORKSPACE_ICON} size="xs" />
               </button>
               <IconPicker
                 open={iconOpen}
                 onClose={() => setIconOpen(false)}
-                currentIcon={activeWorkspace?.icon ?? "🏠"}
+                currentIcon={activeWorkspace?.icon ?? DEFAULT_WORKSPACE_ICON}
                 onSelect={(icon) => void handleIconSelect(icon)}
               />
             </div>

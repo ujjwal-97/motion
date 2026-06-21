@@ -1,6 +1,7 @@
 import { Loader2, ChevronRight } from "lucide-react";
 import { useStore } from "../store";
 import { PageIcon } from "./PageIcon";
+import { DEFAULT_PAGE_ICON } from "../constants/icons";
 
 export function NavBar() {
   const { pages, activePageId, isSaving, selectPage } = useStore();
@@ -42,7 +43,7 @@ export function NavBar() {
                   disabled={isLast}
                 >
                   <span className="flex-shrink-0">
-                    <PageIcon icon={page?.icon ?? "📄"} size="xs" />
+                    <PageIcon icon={page?.icon ?? DEFAULT_PAGE_ICON} size="xs" />
                   </span>
                   <span className="truncate max-w-[140px]">
                     {page?.title || "Untitled"}

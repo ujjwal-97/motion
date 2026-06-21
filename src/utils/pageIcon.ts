@@ -1,3 +1,5 @@
+import { LEGACY_EMOJI_ICON_MAP } from "../constants/icons";
+
 export const LUCIDE_ICON_PREFIX = "lucide:";
 
 export function isIconUrl(icon: string): boolean {
@@ -25,6 +27,12 @@ export function parseLucideIcon(icon: string): string | null {
 
 export function encodeLucideIcon(name: string): string {
   return `${LUCIDE_ICON_PREFIX}${name}`;
+}
+
+export function resolveLucideIconName(icon: string): string | null {
+  const parsed = parseLucideIcon(icon);
+  if (parsed) return parsed;
+  return LEGACY_EMOJI_ICON_MAP[icon] ?? null;
 }
 
 export function normalizeIconUrl(value: string): string | null {

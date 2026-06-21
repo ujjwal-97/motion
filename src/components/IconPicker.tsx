@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { Link2, Shapes } from "lucide-react";
+import { Link2, Search, Shapes } from "lucide-react";
 import { PAGE_ICON_PACK } from "./pageIconPack";
 import { PageIcon } from "./PageIcon";
 import {
   encodeLucideIcon,
   isIconUrl,
   normalizeIconUrl,
+  resolveLucideIconName,
 } from "../utils/pageIcon";
 
 type PickerTab = "icons" | "link";
@@ -18,6 +19,14 @@ interface IconPickerProps {
   onSelect: (icon: string) => void;
 }
 
+function iconMatchesQuery(
+  option: (typeof PAGE_ICON_PACK)[number],
+  query: string
+): boolean {
+  const haystack = `${option.label} ${option.name} ${option.keywords ?? ""}`.toLowerCase();
+  return haystack.includes(query);
+}
+
 export function IconPicker({
   open,
   onClose,
@@ -25,16 +34,32 @@ export function IconPicker({
   onSelect,
 }: IconPickerProps) {
   const [tab, setTab] = useState<PickerTab>("icons");
+  const [query, setQuery] = useState("");
   const [linkValue, setLinkValue] = useState("");
   const [linkError, setLinkError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const selectedLucide = resolveLucideIconName(currentIcon);
+
+  const filteredIcons = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return PAGE_ICON_PACK;
+    return PAGE_ICON_PACK.filter((option) => iconMatchesQuery(option, q));
+  }, [query]);
 
   useEffect(() => {
     if (!open) return;
     setTab("icons");
+    setQuery("");
     setLinkValue(isIconUrl(currentIcon) ? currentIcon : "");
     setLinkError(null);
   }, [open, currentIcon]);
+
+  useEffect(() => {
+    if (!open || tab !== "icons") return;
+    searchRef.current?.focus();
+  }, [open, tab]);
 
   useEffect(() => {
     if (!open) return;
@@ -72,7 +97,7 @@ export function IconPicker({
   return (
     <div
       ref={containerRef}
-      className="absolute left-0 top-full mt-1 z-50 bg-[var(--bg)] border border-[var(--border)] rounded-xl shadow-xl w-80 overflow-hidden"
+      className="absolute left-0 top-full mt-1 z-50 bg-[var(--bg)] border border-[var(--border)] rounded-xl shadow-xl w-[22rem] overflow-hidden"
     >
       <div className="flex border-b border-[var(--border)]">
         <button
@@ -104,29 +129,57 @@ export function IconPicker({
       </div>
 
       {tab === "icons" ? (
-        <div className="p-3 max-h-72 overflow-y-auto text-[var(--text)]">
-          <div className="grid grid-cols-8 gap-1">
-            {PAGE_ICON_PACK.map(({ name, icon: Icon, label }) => {
-              const selected =
-                currentIcon === encodeLucideIcon(name) ||
-                currentIcon === name;
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  title={label}
-                  className={clsx(
-                    "w-8 h-8 flex items-center justify-center rounded-md transition-colors text-[var(--text)]",
-                    selected
-                      ? "bg-[var(--bg-active)] ring-1 ring-[var(--border)]"
-                      : "hover:bg-[var(--bg-hover)]"
-                  )}
-                  onClick={() => handleLucideSelect(name)}
-                >
-                  <Icon size={16} strokeWidth={1.75} className="page-icon-lucide" />
-                </button>
-              );
-            })}
+        <div className="text-[var(--text)]">
+          <div className="p-2 border-b border-[var(--border)]">
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[var(--bg-hover)] border border-[var(--border)]">
+              <Search size={14} className="text-[var(--text-secondary)] flex-shrink-0" />
+              <input
+                ref={searchRef}
+                className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-[var(--text-placeholder)]"
+                placeholder="Search icons…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.stopPropagation();
+                    onClose();
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="p-3 max-h-80 overflow-y-auto">
+            {filteredIcons.length === 0 ? (
+              <p className="px-1 py-6 text-center text-sm text-[var(--text-secondary)]">
+                No icons match your search
+              </p>
+            ) : (
+              <div className="grid grid-cols-8 gap-1">
+                {filteredIcons.map(({ name, icon: Icon, label }) => {
+                  const selected =
+                    selectedLucide === name ||
+                    currentIcon === encodeLucideIcon(name) ||
+                    currentIcon === name;
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      title={label}
+                      className={clsx(
+                        "w-8 h-8 flex items-center justify-center rounded-md transition-colors text-[var(--text)]",
+                        selected
+                          ? "bg-[var(--bg-active)] ring-1 ring-[var(--border)]"
+                          : "hover:bg-[var(--bg-hover)]"
+                      )}
+                      onClick={() => handleLucideSelect(name)}
+                    >
+                      <Icon size={16} strokeWidth={1.75} className="page-icon-lucide" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       ) : (

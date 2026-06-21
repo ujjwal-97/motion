@@ -79,6 +79,9 @@ fn row_to_workspace(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorkspaceMeta> 
     })
 }
 
+const DEFAULT_WORKSPACE_ICON: &str = "lucide:home";
+const DEFAULT_PAGE_ICON: &str = "lucide:file-text";
+
 const WORKSPACE_SELECT: &str = "SELECT w.id, w.name, w.icon,
     (SELECT COUNT(*) FROM pages p
      WHERE p.workspace_id = w.id AND p.is_deleted = 0) AS page_count,
@@ -140,15 +143,15 @@ pub fn create_page(
 
     db.execute(
         "INSERT INTO pages (id, title, icon, parent_id, position, content, workspace_id, created_at, updated_at)
-         VALUES (?, ?, '📄', ?, ?, '', ?, ?, ?)",
-        params![id, title, parent_id, position, workspace_id, now, now],
+         VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)",
+        params![id, title, DEFAULT_PAGE_ICON, parent_id, position, workspace_id, now, now],
     )
     .map_err(|e| e.to_string())?;
 
     Ok(PageMeta {
         id,
         title,
-        icon: "📄".to_string(),
+        icon: DEFAULT_PAGE_ICON.to_string(),
         parent_id,
         position,
         cover_color: None,
@@ -357,8 +360,8 @@ pub fn create_workspace(
 
     db.execute(
         "INSERT INTO workspaces (id, name, icon, created_at, updated_at)
-         VALUES (?, ?, '🏠', ?, ?)",
-        params![id, workspace_name, now, now],
+         VALUES (?, ?, ?, ?, ?)",
+        params![id, workspace_name, DEFAULT_WORKSPACE_ICON, now, now],
     )
     .map_err(|e| e.to_string())?;
 
@@ -372,7 +375,7 @@ pub fn create_workspace(
     Ok(WorkspaceMeta {
         id,
         name: workspace_name,
-        icon: "🏠".to_string(),
+        icon: DEFAULT_WORKSPACE_ICON.to_string(),
         page_count: 0,
         created_at: now,
         updated_at: now,
