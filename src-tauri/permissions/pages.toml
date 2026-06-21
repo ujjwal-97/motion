@@ -1,0 +1,79 @@
+"$schema" = "../gen/schemas/desktop-schema.json"
+
+[[permission]]
+identifier = "allow-list-pages"
+description = "List all pages in the workspace."
+commands.allow = ["list_pages"]
+
+[[permission]]
+identifier = "allow-create-page"
+description = "Create a new page."
+commands.allow = ["create_page"]
+
+[[permission]]
+identifier = "allow-update-page-title"
+description = "Update a page title."
+commands.allow = ["update_page_title"]
+
+[[permission]]
+identifier = "allow-update-page-icon"
+description = "Update a page icon."
+commands.allow = ["update_page_icon"]
+
+[[permission]]
+identifier = "allow-update-page-content"
+description = "Save page content."
+commands.allow = ["update_page_content"]
+
+[[permission]]
+identifier = "allow-get-page-content"
+description = "Load page content."
+commands.allow = ["get_page_content"]
+
+[[permission]]
+identifier = "allow-delete-page"
+description = "Delete a page."
+commands.allow = ["delete_page"]
+
+[[permission]]
+identifier = "allow-move-page"
+description = "Move or reorder a page."
+commands.allow = ["move_page"]
+
+[[permission]]
+identifier = "allow-search-pages"
+description = "Search pages."
+commands.allow = ["search_pages"]
+
+[[permission]]
+identifier = "allow-get-workspace-name"
+description = "Read the workspace name."
+commands.allow = ["get_workspace_name"]
+
+[[permission]]
+identifier = "allow-update-workspace-name"
+description = "Rename the workspace."
+commands.allow = ["update_workspace_name"]
+
+[[permission]]
+identifier = "allow-export-pages"
+description = "Export selected pages as Markdown files."
+commands.allow = ["export_pages"]
+
+[[set]]
+identifier = "pages-default"
+description = "All page management commands."
+permissions = [
+  "allow-list-pages",
+  "allow-create-page",
+  "allow-update-page-title",
+  "allow-update-page-icon",
+  "allow-update-page-content",
+  "allow-get-page-content",
+  "allow-delete-page",
+  "allow-move-page",
+  "allow-search-pages",
+  "allow-get-workspace-name",
+  "allow-update-workspace-name",
+  "allow-export-pages",
+]
