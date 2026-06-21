@@ -238,7 +238,7 @@ pub fn import_markdown_tree(
         let title = title_from_file(&relative, &parsed);
         let icon = parsed
             .icon
-            .unwrap_or_else(|| "📄".to_string());
+            .unwrap_or_else(|| "lucide:file-text".to_string());
 
         let mut parent_id: Option<String> = None;
         if let Some(parent_path) = page_key.parent() {
@@ -260,7 +260,7 @@ pub fn import_markdown_tree(
                         workspace_id,
                         parent_id.clone(),
                         folder_title,
-                        "📁".to_string(),
+                        "lucide:folder".to_string(),
                         String::new(),
                         now,
                     )?;
