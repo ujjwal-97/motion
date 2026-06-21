@@ -13,7 +13,7 @@ import { isDesktopApp } from "./platform";
 export default function App() {
   const {
     loadPages,
-    loadWorkspace,
+    loadWorkspaces,
     activePageId,
     activeContent,
     sidebarOpen,
@@ -28,7 +28,7 @@ export default function App() {
   useEffect(() => {
     if (inDesktopApp) {
       loadPages();
-      loadWorkspace();
+      loadWorkspaces();
     }
   }, [inDesktopApp]);
 

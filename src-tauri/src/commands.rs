@@ -1,11 +1,13 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
 use uuid::Uuid;
 
+use crate::markdown;
 use crate::AppState;
 
 fn now_ms() -> i64 {
@@ -37,19 +39,59 @@ pub struct SearchResult {
     pub snippet: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceMeta {
+    pub id: String,
+    pub name: String,
+    pub icon: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+const ACTIVE_WORKSPACE_KEY: &str = "active_workspace_id";
+
+fn get_active_workspace_id(db: &rusqlite::Connection) -> Result<String, String> {
+    let active: String = db
+        .query_row(
+            "SELECT value FROM settings WHERE key = ?",
+            params![ACTIVE_WORKSPACE_KEY],
+            |row| row.get(0),
+        )
+        .map_err(|_| "No active workspace".to_string())?;
+
+    if active.trim().is_empty() {
+        return Err("No active workspace".to_string());
+    }
+
+    Ok(active)
+}
+
+fn row_to_workspace(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorkspaceMeta> {
+    Ok(WorkspaceMeta {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        icon: row.get(2)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
+    })
+}
+
 #[tauri::command]
 pub fn list_pages(state: State<AppState>) -> Result<Vec<PageMeta>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
+    let workspace_id = get_active_workspace_id(&db)?;
     let mut stmt = db
         .prepare(
             "SELECT id, title, icon, parent_id, position, cover_color, created_at, updated_at
-             FROM pages WHERE is_deleted = 0
+             FROM pages
+             WHERE is_deleted = 0 AND workspace_id = ?
              ORDER BY parent_id NULLS FIRST, position ASC, created_at ASC",
         )
         .map_err(|e| e.to_string())?;
 
     let pages = stmt
-        .query_map([], |row| {
+        .query_map(params![workspace_id], |row| {
             Ok(PageMeta {
                 id: row.get(0)?,
                 title: row.get(1)?,
@@ -75,21 +117,23 @@ pub fn create_page(
     title: String,
 ) -> Result<PageMeta, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
+    let workspace_id = get_active_workspace_id(&db)?;
     let id = Uuid::new_v4().to_string();
     let now = now_ms();
 
     let position: i32 = db
         .query_row(
-            "SELECT COALESCE(MAX(position), -1) + 1 FROM pages WHERE parent_id IS ? AND is_deleted = 0",
-            params![parent_id],
+            "SELECT COALESCE(MAX(position), -1) + 1 FROM pages
+             WHERE parent_id IS ? AND workspace_id = ? AND is_deleted = 0",
+            params![parent_id, workspace_id],
             |row| row.get(0),
         )
         .unwrap_or(0);
 
     db.execute(
-        "INSERT INTO pages (id, title, icon, parent_id, position, content, created_at, updated_at)
-         VALUES (?, ?, '📄', ?, ?, '', ?, ?)",
-        params![id, title, parent_id, position, now, now],
+        "INSERT INTO pages (id, title, icon, parent_id, position, content, workspace_id, created_at, updated_at)
+         VALUES (?, ?, '📄', ?, ?, '', ?, ?, ?)",
+        params![id, title, parent_id, position, workspace_id, now, now],
     )
     .map_err(|e| e.to_string())?;
 
@@ -218,18 +262,20 @@ pub fn search_pages(
     query: String,
 ) -> Result<Vec<SearchResult>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
+    let workspace_id = get_active_workspace_id(&db)?;
     let pattern = format!("%{}%", query.to_lowercase());
 
     let mut stmt = db
         .prepare(
             "SELECT id, title, icon, content FROM pages
-             WHERE is_deleted = 0 AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ?)
+             WHERE is_deleted = 0 AND workspace_id = ?
+               AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ?)
              ORDER BY updated_at DESC LIMIT 20",
         )
         .map_err(|e| e.to_string())?;
 
     let results = stmt
-        .query_map(params![pattern, pattern], |row| {
+        .query_map(params![workspace_id, pattern, pattern], |row| {
             let content: String = row.get(3)?;
             let stripped = strip_html(&content);
             let snippet = if stripped.len() > 120 {
@@ -251,20 +297,246 @@ pub fn search_pages(
     Ok(results)
 }
 
-const WORKSPACE_NAME_KEY: &str = "workspace_name";
-const DEFAULT_WORKSPACE_NAME: &str = "My Workspace";
+#[tauri::command]
+pub fn list_workspaces(state: State<AppState>) -> Result<Vec<WorkspaceMeta>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let mut stmt = db
+        .prepare(
+            "SELECT id, name, icon, created_at, updated_at
+             FROM workspaces
+             WHERE is_deleted = 0
+             ORDER BY created_at ASC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let workspaces = stmt
+        .query_map([], row_to_workspace)
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    Ok(workspaces)
+}
+
+#[tauri::command]
+pub fn get_active_workspace(state: State<AppState>) -> Result<WorkspaceMeta, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let workspace_id = get_active_workspace_id(&db)?;
+    db.query_row(
+        "SELECT id, name, icon, created_at, updated_at
+         FROM workspaces WHERE id = ? AND is_deleted = 0",
+        params![workspace_id],
+        row_to_workspace,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_workspace(
+    state: State<AppState>,
+    name: Option<String>,
+) -> Result<WorkspaceMeta, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let id = Uuid::new_v4().to_string();
+    let now = now_ms();
+    let trimmed = name
+        .unwrap_or_else(|| "New Workspace".to_string())
+        .trim()
+        .to_string();
+    let workspace_name = if trimmed.is_empty() {
+        "New Workspace".to_string()
+    } else if trimmed.len() > 80 {
+        return Err("Workspace name must be 80 characters or fewer".to_string());
+    } else {
+        trimmed
+    };
+
+    db.execute(
+        "INSERT INTO workspaces (id, name, icon, created_at, updated_at)
+         VALUES (?, ?, '🏠', ?, ?)",
+        params![id, workspace_name, now, now],
+    )
+    .map_err(|e| e.to_string())?;
+
+    db.execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![ACTIVE_WORKSPACE_KEY, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(WorkspaceMeta {
+        id,
+        name: workspace_name,
+        icon: "🏠".to_string(),
+        created_at: now,
+        updated_at: now,
+    })
+}
+
+#[tauri::command]
+pub fn switch_workspace(state: State<AppState>, id: String) -> Result<WorkspaceMeta, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let workspace = db
+        .query_row(
+            "SELECT id, name, icon, created_at, updated_at
+             FROM workspaces WHERE id = ? AND is_deleted = 0",
+            params![id],
+            row_to_workspace,
+        )
+        .map_err(|_| "Workspace not found".to_string())?;
+
+    db.execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![ACTIVE_WORKSPACE_KEY, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(workspace)
+}
+
+#[tauri::command]
+pub fn update_workspace(
+    state: State<AppState>,
+    id: String,
+    name: Option<String>,
+    icon: Option<String>,
+) -> Result<WorkspaceMeta, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let existing = db
+        .query_row(
+            "SELECT id, name, icon, created_at, updated_at
+             FROM workspaces WHERE id = ? AND is_deleted = 0",
+            params![id],
+            row_to_workspace,
+        )
+        .map_err(|_| "Workspace not found".to_string())?;
+
+    let next_name = if let Some(name) = name {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err("Workspace name cannot be empty".to_string());
+        }
+        if trimmed.len() > 80 {
+            return Err("Workspace name must be 80 characters or fewer".to_string());
+        }
+        trimmed.to_string()
+    } else {
+        existing.name
+    };
+
+    let next_icon = icon.unwrap_or(existing.icon);
+    let now = now_ms();
+
+    db.execute(
+        "UPDATE workspaces SET name = ?, icon = ?, updated_at = ? WHERE id = ?",
+        params![next_name, next_icon, now, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(WorkspaceMeta {
+        id,
+        name: next_name,
+        icon: next_icon,
+        created_at: existing.created_at,
+        updated_at: now,
+    })
+}
+
+#[tauri::command]
+pub fn delete_workspace(state: State<AppState>, id: String) -> Result<WorkspaceMeta, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    let count: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM workspaces WHERE is_deleted = 0",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    if count <= 1 {
+        return Err("You must keep at least one workspace".to_string());
+    }
+
+    db.query_row(
+        "SELECT id FROM workspaces WHERE id = ? AND is_deleted = 0",
+        params![id],
+        |row| row.get::<_, String>(0),
+    )
+    .map_err(|_| "Workspace not found".to_string())?;
+
+    let now = now_ms();
+    db.execute(
+        "UPDATE workspaces SET is_deleted = 1, updated_at = ? WHERE id = ?",
+        params![now, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    soft_delete_workspace_pages(&db, &id, now)?;
+
+    let active_id = get_active_workspace_id(&db)?;
+    if active_id == id {
+        let fallback: WorkspaceMeta = db
+            .query_row(
+                "SELECT id, name, icon, created_at, updated_at
+                 FROM workspaces
+                 WHERE is_deleted = 0
+                 ORDER BY created_at ASC
+                 LIMIT 1",
+                [],
+                row_to_workspace,
+            )
+            .map_err(|e| e.to_string())?;
+
+        db.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![ACTIVE_WORKSPACE_KEY, fallback.id],
+        )
+        .map_err(|e| e.to_string())?;
+
+        return Ok(fallback);
+    }
+
+    let workspace = db
+        .query_row(
+            "SELECT id, name, icon, created_at, updated_at
+             FROM workspaces WHERE id = ? AND is_deleted = 0",
+            params![active_id],
+            row_to_workspace,
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(workspace)
+}
+
+fn soft_delete_workspace_pages(
+    db: &rusqlite::Connection,
+    workspace_id: &str,
+    now: i64,
+) -> Result<(), String> {
+    let mut stmt = db
+        .prepare("SELECT id FROM pages WHERE workspace_id = ? AND is_deleted = 0")
+        .map_err(|e| e.to_string())?;
+    let page_ids = stmt
+        .query_map(params![workspace_id], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    for page_id in page_ids {
+        delete_recursive(db, &page_id, now)?;
+    }
+
+    Ok(())
+}
 
 #[tauri::command]
 pub fn get_workspace_name(state: State<AppState>) -> Result<String, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    let name: String = db
-        .query_row(
-            "SELECT value FROM settings WHERE key = ?",
-            params![WORKSPACE_NAME_KEY],
-            |row| row.get(0),
-        )
-        .unwrap_or_else(|_| DEFAULT_WORKSPACE_NAME.to_string());
-    Ok(name)
+    let workspace = get_active_workspace(state)?;
+    Ok(workspace.name)
 }
 
 #[tauri::command]
@@ -278,15 +550,14 @@ pub fn update_workspace_name(state: State<AppState>, name: String) -> Result<(),
     }
 
     let db = state.db.lock().map_err(|e| e.to_string())?;
+    let workspace_id = get_active_workspace_id(&db)?;
     db.execute(
-        "INSERT INTO settings (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        params![WORKSPACE_NAME_KEY, trimmed],
+        "UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?",
+        params![trimmed, now_ms(), workspace_id],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
 }
-
 #[derive(Debug, Clone)]
 struct PageExportRow {
     id: String,
@@ -321,14 +592,16 @@ pub fn export_pages(
     std::fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
 
     let db = state.db.lock().map_err(|e| e.to_string())?;
+    let workspace_id = get_active_workspace_id(&db)?;
     let mut stmt = db
         .prepare(
-            "SELECT id, title, icon, parent_id, content FROM pages WHERE is_deleted = 0",
+            "SELECT id, title, icon, parent_id, content FROM pages
+             WHERE is_deleted = 0 AND workspace_id = ?",
         )
         .map_err(|e| e.to_string())?;
 
     let all_pages: Vec<PageExportRow> = stmt
-        .query_map([], |row| {
+        .query_map(params![workspace_id], |row| {
             Ok(PageExportRow {
                 id: row.get(0)?,
                 title: row.get(1)?,
@@ -397,10 +670,70 @@ pub fn export_pages(
         exported_count += 1;
     }
 
+    let workspace_name: String = db
+        .query_row(
+            "SELECT name FROM workspaces WHERE id = ?",
+            params![workspace_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    write_export_manifest(&dest, &workspace_name, exported_count)?;
+
     Ok(ExportResult {
         exported_count,
         destination: dest.display().to_string(),
     })
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    pub imported_count: u32,
+    pub source: String,
+}
+
+#[tauri::command]
+pub fn import_pages(state: State<AppState>, source: String) -> Result<ImportResult, String> {
+    let src = PathBuf::from(source.trim());
+    if src.as_os_str().is_empty() {
+        return Err("Import source is required".to_string());
+    }
+    if !src.is_dir() {
+        return Err("Import source must be a folder".to_string());
+    }
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let workspace_id = get_active_workspace_id(&db)?;
+    let imported_count =
+        markdown::import_markdown_tree(&db, &workspace_id, &src).map_err(|e| e.to_string())?;
+
+    Ok(ImportResult {
+        imported_count,
+        source: src.display().to_string(),
+    })
+}
+
+fn write_export_manifest(
+    dest: &Path,
+    workspace_name: &str,
+    exported_count: u32,
+) -> Result<(), String> {
+    let manifest = serde_json::json!({
+        "version": 1,
+        "format": "motion-markdown",
+        "workspaceName": workspace_name,
+        "exportedCount": exported_count,
+        "exportedAt": now_ms(),
+    });
+
+    fs::write(
+        dest.join("motion-export.json"),
+        serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| format!("Failed to write export manifest: {e}"))?;
+
+    Ok(())
 }
 
 fn build_export_relative_path(

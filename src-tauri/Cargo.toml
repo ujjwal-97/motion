@@ -27,4 +27,5 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
 htmd = "0.1"
+pulldown-cmark = "0.13"
 
