@@ -2,6 +2,7 @@ export interface WorkspaceMeta {
   id: string;
   name: string;
   icon: string;
+  pageCount: number;
   createdAt: number;
   updatedAt: number;
 }

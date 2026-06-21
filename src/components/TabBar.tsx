@@ -1,6 +1,7 @@
 import { PanelLeft, Plus, X } from "lucide-react";
 import { clsx } from "clsx";
 import { useStore } from "../store";
+import { PageIcon } from "./PageIcon";
 
 export function TabBar() {
   const {
@@ -70,8 +71,8 @@ export function TabBar() {
                 )}
                 onClick={() => void selectPage(page.id, { switchOnly: true })}
               >
-                <span className="text-sm flex-shrink-0 leading-none">
-                  {page.icon}
+                <span className="flex-shrink-0 leading-none">
+                  <PageIcon icon={page.icon} size="xs" />
                 </span>
                 <span className="text-xs truncate flex-1 font-medium">
                   {page.title || "Untitled"}

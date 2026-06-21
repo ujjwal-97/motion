@@ -30,6 +30,7 @@ interface AppStore {
   createWorkspace: (name?: string) => Promise<WorkspaceMeta>;
   deleteWorkspace: (id: string) => Promise<void>;
   updateWorkspaceName: (name: string) => Promise<void>;
+  updateWorkspaceIcon: (icon: string) => Promise<void>;
   loadWorkspace: () => Promise<void>;
   exportPages: (
     pageIds: string[],
@@ -191,6 +192,25 @@ export const useStore = create<AppStore>((set, get) => ({
       }));
     } catch (e) {
       const message = formatError(e, "Could not rename workspace");
+      set({ error: message });
+      throw new Error(message);
+    }
+  },
+
+  updateWorkspaceIcon: async (icon: string) => {
+    const { activeWorkspaceId } = get();
+    if (!activeWorkspaceId) return;
+
+    try {
+      const workspace = await api.updateWorkspace(activeWorkspaceId, { icon });
+      set((s) => ({
+        workspaces: s.workspaces.map((w) =>
+          w.id === workspace.id ? workspace : w
+        ),
+        error: null,
+      }));
+    } catch (e) {
+      const message = formatError(e, "Could not update workspace icon");
       set({ error: message });
       throw new Error(message);
     }

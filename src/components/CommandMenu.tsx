@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { useStore } from "../store";
 import type { SearchResult } from "../types";
 import { clsx } from "clsx";
+import { PageIcon } from "./PageIcon";
 
 export function CommandMenu() {
   const { commandMenuOpen, toggleCommandMenu, selectPage } = useStore();
@@ -117,7 +118,9 @@ export function CommandMenu() {
                   toggleCommandMenu();
                 }}
               >
-                <span className="text-lg mt-0.5 flex-shrink-0">{result.icon}</span>
+                <span className="mt-0.5 flex-shrink-0">
+                  <PageIcon icon={result.icon} size="md" />
+                </span>
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-[var(--text)] truncate">
                     {result.title || "Untitled"}
