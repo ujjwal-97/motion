@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { PageMeta, SearchResult } from "./types";
+import type { PageMeta, SearchResult, WorkspaceMeta } from "./types";
 
 export const api = {
   listPages: () => invoke<PageMeta[]>("list_pages"),
@@ -25,6 +25,29 @@ export const api = {
 
   searchPages: (query: string) => invoke<SearchResult[]>("search_pages", { query }),
 
+  listWorkspaces: () => invoke<WorkspaceMeta[]>("list_workspaces"),
+
+  getActiveWorkspace: () => invoke<WorkspaceMeta>("get_active_workspace"),
+
+  createWorkspace: (name?: string) =>
+    invoke<WorkspaceMeta>("create_workspace", { name: name ?? null }),
+
+  switchWorkspace: (id: string) =>
+    invoke<WorkspaceMeta>("switch_workspace", { id }),
+
+  updateWorkspace: (
+    id: string,
+    options?: { name?: string; icon?: string }
+  ) =>
+    invoke<WorkspaceMeta>("update_workspace", {
+      id,
+      name: options?.name ?? null,
+      icon: options?.icon ?? null,
+    }),
+
+  deleteWorkspace: (id: string) =>
+    invoke<WorkspaceMeta>("delete_workspace", { id }),
+
   getWorkspaceName: () => invoke<string>("get_workspace_name"),
 
   updateWorkspaceName: (name: string) =>
@@ -34,5 +57,10 @@ export const api = {
     invoke<{ exportedCount: number; destination: string }>("export_pages", {
       pageIds,
       destination,
+    }),
+
+  importPages: (source: string) =>
+    invoke<{ importedCount: number; source: string }>("import_pages", {
+      source,
     }),
 };

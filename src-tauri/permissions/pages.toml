@@ -46,6 +46,36 @@ description = "Search pages."
 commands.allow = ["search_pages"]
 
 [[permission]]
+identifier = "allow-list-workspaces"
+description = "List all workspaces."
+commands.allow = ["list_workspaces"]
+
+[[permission]]
+identifier = "allow-get-active-workspace"
+description = "Read the active workspace."
+commands.allow = ["get_active_workspace"]
+
+[[permission]]
+identifier = "allow-create-workspace"
+description = "Create a workspace."
+commands.allow = ["create_workspace"]
+
+[[permission]]
+identifier = "allow-switch-workspace"
+description = "Switch the active workspace."
+commands.allow = ["switch_workspace"]
+
+[[permission]]
+identifier = "allow-update-workspace"
+description = "Update a workspace."
+commands.allow = ["update_workspace"]
+
+[[permission]]
+identifier = "allow-delete-workspace"
+description = "Delete a workspace."
+commands.allow = ["delete_workspace"]
+
+[[permission]]
 identifier = "allow-get-workspace-name"
 description = "Read the workspace name."
 commands.allow = ["get_workspace_name"]
@@ -60,6 +90,11 @@ identifier = "allow-export-pages"
 description = "Export selected pages as Markdown files."
 commands.allow = ["export_pages"]
 
+[[permission]]
+identifier = "allow-import-pages"
+description = "Import Markdown files from a folder."
+commands.allow = ["import_pages"]
+
 [[set]]
 identifier = "pages-default"
 description = "All page management commands."
@@ -73,7 +108,14 @@ permissions = [
   "allow-delete-page",
   "allow-move-page",
   "allow-search-pages",
+  "allow-list-workspaces",
+  "allow-get-active-workspace",
+  "allow-create-workspace",
+  "allow-switch-workspace",
+  "allow-update-workspace",
+  "allow-delete-workspace",
   "allow-get-workspace-name",
   "allow-update-workspace-name",
   "allow-export-pages",
+  "allow-import-pages",
 ]

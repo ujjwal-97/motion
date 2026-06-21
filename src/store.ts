@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api } from "./api";
-import type { PageMeta, SearchResult } from "./types";
+import type { PageMeta, SearchResult, WorkspaceMeta } from "./types";
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -12,6 +12,8 @@ interface AppStore {
   openTabIds: string[];
 
   // ── Workspace ──
+  workspaces: WorkspaceMeta[];
+  activeWorkspaceId: string | null;
   workspaceName: string;
 
   // ── UI state ──
@@ -23,13 +25,20 @@ interface AppStore {
 
   // ── Actions ──
   loadPages: () => Promise<void>;
-  loadWorkspace: () => Promise<void>;
+  loadWorkspaces: () => Promise<void>;
+  switchWorkspace: (id: string) => Promise<void>;
+  createWorkspace: (name?: string) => Promise<WorkspaceMeta>;
+  deleteWorkspace: (id: string) => Promise<void>;
   updateWorkspaceName: (name: string) => Promise<void>;
+  loadWorkspace: () => Promise<void>;
   exportPages: (
     pageIds: string[],
     destination: string,
     options?: { activePageId: string | null; activeContent: string }
   ) => Promise<{ exportedCount: number; destination: string }>;
+  importPages: (
+    source: string
+  ) => Promise<{ importedCount: number; source: string }>;
   selectPage: (id: string, options?: { switchOnly?: boolean }) => Promise<void>;
   closeTab: (id: string) => void;
   openNewTab: () => Promise<PageMeta>;
@@ -51,6 +60,8 @@ export const useStore = create<AppStore>((set, get) => ({
   activePageId: null,
   activeContent: "",
   openTabIds: [],
+  workspaces: [],
+  activeWorkspaceId: null,
   workspaceName: "My Workspace",
   sidebarOpen: true,
   commandMenuOpen: false,
@@ -76,21 +87,108 @@ export const useStore = create<AppStore>((set, get) => ({
     }
   },
 
-  loadWorkspace: async () => {
+  loadWorkspaces: async () => {
     try {
-      const workspaceName = await api.getWorkspaceName();
-      set({ workspaceName, error: null });
+      const [workspaces, active] = await Promise.all([
+        api.listWorkspaces(),
+        api.getActiveWorkspace(),
+      ]);
+      set({
+        workspaces,
+        activeWorkspaceId: active.id,
+        workspaceName: active.name,
+        error: null,
+      });
     } catch (e) {
-      console.error("Failed to load workspace:", e);
-      set({ error: formatError(e, "Could not load workspace") });
+      console.error("Failed to load workspaces:", e);
+      set({ error: formatError(e, "Could not load workspaces") });
+    }
+  },
+
+  loadWorkspace: async () => {
+    await get().loadWorkspaces();
+  },
+
+  switchWorkspace: async (id: string) => {
+    if (get().activeWorkspaceId === id) return;
+
+    try {
+      const active = await api.switchWorkspace(id);
+      set({
+        workspaces: get().workspaces.map((w) => (w.id === active.id ? active : w)),
+        activeWorkspaceId: active.id,
+        workspaceName: active.name,
+        pages: [],
+        openTabIds: [],
+        activePageId: null,
+        activeContent: "",
+        commandMenuOpen: false,
+        error: null,
+      });
+      await get().loadPages();
+    } catch (e) {
+      const message = formatError(e, "Could not switch workspace");
+      set({ error: message });
+      throw new Error(message);
+    }
+  },
+
+  createWorkspace: async (name?: string) => {
+    try {
+      const workspace = await api.createWorkspace(name);
+      const workspaces = await api.listWorkspaces();
+      set({ workspaces, error: null });
+      await get().switchWorkspace(workspace.id);
+      return workspace;
+    } catch (e) {
+      const message = formatError(e, "Could not create workspace");
+      set({ error: message });
+      throw new Error(message);
+    }
+  },
+
+  deleteWorkspace: async (id: string) => {
+    try {
+      const active = await api.deleteWorkspace(id);
+      const workspaces = await api.listWorkspaces();
+      const switching = get().activeWorkspaceId === id;
+      set({
+        workspaces,
+        activeWorkspaceId: active.id,
+        workspaceName: active.name,
+        error: null,
+      });
+      if (switching) {
+        set({
+          pages: [],
+          openTabIds: [],
+          activePageId: null,
+          activeContent: "",
+          commandMenuOpen: false,
+        });
+        await get().loadPages();
+      }
+    } catch (e) {
+      const message = formatError(e, "Could not delete workspace");
+      set({ error: message });
+      throw new Error(message);
     }
   },
 
   updateWorkspaceName: async (name: string) => {
     const trimmed = name.trim() || "My Workspace";
+    const { activeWorkspaceId } = get();
+    if (!activeWorkspaceId) return;
+
     try {
-      await api.updateWorkspaceName(trimmed);
-      set({ workspaceName: trimmed, error: null });
+      const workspace = await api.updateWorkspace(activeWorkspaceId, { name: trimmed });
+      set((s) => ({
+        workspaceName: workspace.name,
+        workspaces: s.workspaces.map((w) =>
+          w.id === workspace.id ? workspace : w
+        ),
+        error: null,
+      }));
     } catch (e) {
       const message = formatError(e, "Could not rename workspace");
       set({ error: message });
@@ -115,7 +213,20 @@ export const useStore = create<AppStore>((set, get) => ({
       set({ error: null });
       return result;
     } catch (e) {
-      const message = formatError(e, "Could not export workspace");
+      const message = formatError(e, "Could not export");
+      set({ error: message });
+      throw new Error(message);
+    }
+  },
+
+  importPages: async (source) => {
+    try {
+      const result = await api.importPages(source);
+      await get().loadPages();
+      set({ error: null });
+      return result;
+    } catch (e) {
+      const message = formatError(e, "Could not import");
       set({ error: message });
       throw new Error(message);
     }

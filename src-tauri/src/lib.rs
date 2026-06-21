@@ -1,4 +1,6 @@
 mod commands;
+mod db;
+mod markdown;
 
 use rusqlite::Connection;
 use std::sync::Mutex;
@@ -23,10 +25,7 @@ pub fn run() {
             let db_path = data_dir.join("motion.db");
             let conn = Connection::open(&db_path).expect("failed to open database");
 
-            conn.execute_batch(include_str!("../migrations/001_init.sql"))
-                .expect("failed to initialize database schema");
-            conn.execute_batch(include_str!("../migrations/002_settings.sql"))
-                .expect("failed to initialize settings schema");
+            db::run_migrations(&conn).expect("failed to run database migrations");
 
             app.manage(AppState {
                 db: Mutex::new(conn),
@@ -44,9 +43,16 @@ pub fn run() {
             commands::delete_page,
             commands::move_page,
             commands::search_pages,
+            commands::list_workspaces,
+            commands::get_active_workspace,
+            commands::create_workspace,
+            commands::switch_workspace,
+            commands::update_workspace,
+            commands::delete_workspace,
             commands::get_workspace_name,
             commands::update_workspace_name,
             commands::export_pages,
+            commands::import_pages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,3 +1,11 @@
+export interface WorkspaceMeta {
+  id: string;
+  name: string;
+  icon: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface PageMeta {
   id: string;
   title: string;
