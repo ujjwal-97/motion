@@ -45,6 +45,7 @@ pub struct WorkspaceMeta {
     pub id: String,
     pub name: String,
     pub icon: String,
+    pub page_count: u32,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -72,10 +73,17 @@ fn row_to_workspace(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorkspaceMeta> 
         id: row.get(0)?,
         name: row.get(1)?,
         icon: row.get(2)?,
-        created_at: row.get(3)?,
-        updated_at: row.get(4)?,
+        page_count: row.get::<_, i64>(3)? as u32,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
     })
 }
+
+const WORKSPACE_SELECT: &str = "SELECT w.id, w.name, w.icon,
+    (SELECT COUNT(*) FROM pages p
+     WHERE p.workspace_id = w.id AND p.is_deleted = 0) AS page_count,
+    w.created_at, w.updated_at
+ FROM workspaces w";
 
 #[tauri::command]
 pub fn list_pages(state: State<AppState>) -> Result<Vec<PageMeta>, String> {
@@ -301,12 +309,9 @@ pub fn search_pages(
 pub fn list_workspaces(state: State<AppState>) -> Result<Vec<WorkspaceMeta>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let mut stmt = db
-        .prepare(
-            "SELECT id, name, icon, created_at, updated_at
-             FROM workspaces
-             WHERE is_deleted = 0
-             ORDER BY created_at ASC",
-        )
+        .prepare(&format!(
+            "{WORKSPACE_SELECT} WHERE w.is_deleted = 0 ORDER BY w.created_at ASC"
+        ))
         .map_err(|e| e.to_string())?;
 
     let workspaces = stmt
@@ -323,8 +328,7 @@ pub fn get_active_workspace(state: State<AppState>) -> Result<WorkspaceMeta, Str
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let workspace_id = get_active_workspace_id(&db)?;
     db.query_row(
-        "SELECT id, name, icon, created_at, updated_at
-         FROM workspaces WHERE id = ? AND is_deleted = 0",
+        &format!("{WORKSPACE_SELECT} WHERE w.id = ? AND w.is_deleted = 0"),
         params![workspace_id],
         row_to_workspace,
     )
@@ -369,6 +373,7 @@ pub fn create_workspace(
         id,
         name: workspace_name,
         icon: "🏠".to_string(),
+        page_count: 0,
         created_at: now,
         updated_at: now,
     })
@@ -379,8 +384,7 @@ pub fn switch_workspace(state: State<AppState>, id: String) -> Result<WorkspaceM
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let workspace = db
         .query_row(
-            "SELECT id, name, icon, created_at, updated_at
-             FROM workspaces WHERE id = ? AND is_deleted = 0",
+            &format!("{WORKSPACE_SELECT} WHERE w.id = ? AND w.is_deleted = 0"),
             params![id],
             row_to_workspace,
         )
@@ -406,8 +410,7 @@ pub fn update_workspace(
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let existing = db
         .query_row(
-            "SELECT id, name, icon, created_at, updated_at
-             FROM workspaces WHERE id = ? AND is_deleted = 0",
+            &format!("{WORKSPACE_SELECT} WHERE w.id = ? AND w.is_deleted = 0"),
             params![id],
             row_to_workspace,
         )
@@ -439,6 +442,7 @@ pub fn update_workspace(
         id,
         name: next_name,
         icon: next_icon,
+        page_count: existing.page_count,
         created_at: existing.created_at,
         updated_at: now,
     })
@@ -480,11 +484,9 @@ pub fn delete_workspace(state: State<AppState>, id: String) -> Result<WorkspaceM
     if active_id == id {
         let fallback: WorkspaceMeta = db
             .query_row(
-                "SELECT id, name, icon, created_at, updated_at
-                 FROM workspaces
-                 WHERE is_deleted = 0
-                 ORDER BY created_at ASC
-                 LIMIT 1",
+                &format!(
+                    "{WORKSPACE_SELECT} WHERE w.is_deleted = 0 ORDER BY w.created_at ASC LIMIT 1"
+                ),
                 [],
                 row_to_workspace,
             )
@@ -502,8 +504,7 @@ pub fn delete_workspace(state: State<AppState>, id: String) -> Result<WorkspaceM
 
     let workspace = db
         .query_row(
-            "SELECT id, name, icon, created_at, updated_at
-             FROM workspaces WHERE id = ? AND is_deleted = 0",
+            &format!("{WORKSPACE_SELECT} WHERE w.id = ? AND w.is_deleted = 0"),
             params![active_id],
             row_to_workspace,
         )

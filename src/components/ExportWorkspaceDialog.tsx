@@ -10,6 +10,7 @@ import {
   toggleNodeSelection,
   type SelectionState,
 } from "../utils/exportSelection";
+import { PageIcon } from "./PageIcon";
 
 interface ExportWorkspaceDialogProps {
   open: boolean;
@@ -88,8 +89,8 @@ function ExportTreeItem({
           <Folder size={14} className="text-[var(--text-secondary)] flex-shrink-0" />
         ) : null}
 
-        <span className="w-5 h-5 flex items-center justify-center text-[15px] flex-shrink-0">
-          {node.icon}
+        <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+          <PageIcon icon={node.icon} size="xs" />
         </span>
 
         <span className="text-sm text-[var(--text)] truncate flex-1">

@@ -10,12 +10,15 @@ import {
   Upload,
   Pencil,
   ChevronDown,
+  Shapes,
 } from "lucide-react";
 import { useStore } from "../store";
 import { buildTree, type PageNode } from "../types";
 import { clsx } from "clsx";
 import { ExportWorkspaceDialog } from "./ExportWorkspaceDialog";
 import { ImportWorkspaceDialog } from "./ImportWorkspaceDialog";
+import { IconPicker } from "./IconPicker";
+import { PageIcon } from "./PageIcon";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 /* ── Page Item ─────────────────────────────────────── */
@@ -84,8 +87,8 @@ function PageItem({ node, depth }: PageItemProps) {
         </button>
 
         {/* Icon */}
-        <span className="w-5 h-5 flex items-center justify-center text-[15px] flex-shrink-0">
-          {node.icon}
+        <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+          <PageIcon icon={node.icon} size="xs" />
         </span>
 
         {/* Title */}
@@ -162,6 +165,7 @@ function WorkspaceHeader() {
     activeWorkspaceId,
     workspaceName,
     updateWorkspaceName,
+    updateWorkspaceIcon,
     deleteWorkspace,
     createWorkspace,
   } = useStore();
@@ -170,9 +174,11 @@ function WorkspaceHeader() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [iconOpen, setIconOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(workspaceName);
   const menuRef = useRef<HTMLDivElement>(null);
+  const iconRef = useRef<HTMLDivElement>(null);
   const switcherAnchorRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -201,8 +207,23 @@ function WorkspaceHeader() {
   const startEditing = () => {
     setMenuOpen(false);
     setSwitcherOpen(false);
+    setIconOpen(false);
     setValue(workspaceName);
     setEditing(true);
+  };
+
+  const openIconPicker = () => {
+    setMenuOpen(false);
+    setSwitcherOpen(false);
+    setIconOpen(true);
+  };
+
+  const handleIconSelect = async (icon: string) => {
+    try {
+      await updateWorkspaceIcon(icon);
+    } catch {
+      // Error shown in global banner.
+    }
   };
 
   const handleDeleteWorkspace = async () => {
@@ -269,12 +290,30 @@ function WorkspaceHeader() {
             onClick={() => {
               if (editing) return;
               setMenuOpen(false);
+              setIconOpen(false);
               setSwitcherOpen((v) => !v);
             }}
           >
-            <span className="w-5 text-center text-[15px] flex-shrink-0">
-              {activeWorkspace?.icon ?? "🏠"}
-            </span>
+            <div className="relative flex-shrink-0" ref={iconRef}>
+              <button
+                type="button"
+                data-tauri-drag-region="false"
+                className="w-6 h-6 flex items-center justify-center rounded text-[var(--text)] hover:bg-[var(--bg-active)] transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openIconPicker();
+                }}
+                title="Change icon"
+              >
+                <PageIcon icon={activeWorkspace?.icon ?? "🏠"} size="xs" />
+              </button>
+              <IconPicker
+                open={iconOpen}
+                onClose={() => setIconOpen(false)}
+                currentIcon={activeWorkspace?.icon ?? "🏠"}
+                onSelect={(icon) => void handleIconSelect(icon)}
+              />
+            </div>
             <div className="flex items-center gap-1 min-w-0 flex-1">
               {editing ? (
                 <input
@@ -346,6 +385,14 @@ function WorkspaceHeader() {
                   >
                     <Pencil size={13} className="text-[var(--text-secondary)]" />
                     Rename
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--bg-hover)]"
+                    onClick={openIconPicker}
+                  >
+                    <Shapes size={13} className="text-[var(--text-secondary)]" />
+                    Icon
                   </button>
                   <button
                     type="button"

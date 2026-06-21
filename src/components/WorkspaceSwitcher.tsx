@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Check, Plus } from "lucide-react";
 import { clsx } from "clsx";
 import { useStore } from "../store";
+import { PageIcon } from "./PageIcon";
 
 interface WorkspaceSwitcherProps {
   open: boolean;
@@ -88,10 +89,13 @@ export function WorkspaceSwitcher({
               )}
               onClick={() => void handleSwitch(workspace.id)}
             >
-              <span className="w-5 text-center flex-shrink-0">
-                {workspace.icon}
+              <span className="w-5 flex items-center justify-center flex-shrink-0 text-[var(--text)]">
+                <PageIcon icon={workspace.icon} size="xs" />
               </span>
               <span className="truncate flex-1">{workspace.name}</span>
+              <span className="text-[11px] text-[var(--text-secondary)] flex-shrink-0">
+                {workspace.pageCount} {workspace.pageCount === 1 ? "page" : "pages"}
+              </span>
               {isActive && (
                 <Check size={14} className="flex-shrink-0 text-[var(--accent)]" />
               )}
